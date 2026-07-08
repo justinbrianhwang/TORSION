@@ -1,0 +1,8 @@
+[
+  {
+    "token": "calib_lidar_top",
+    "sensor_token": "sensor_lidar_top",
+    "translation": [0.0, 0.0, 1.8],
+    "rotation": [1.0, 0.0, 0.0, 0.0]
+  }
+]

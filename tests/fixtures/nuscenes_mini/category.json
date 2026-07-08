@@ -1,0 +1,10 @@
+[
+  {
+    "token": "category_vehicle_car",
+    "name": "vehicle.car"
+  },
+  {
+    "token": "category_pedestrian_adult",
+    "name": "human.pedestrian.adult"
+  }
+]

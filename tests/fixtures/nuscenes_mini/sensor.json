@@ -1,0 +1,7 @@
+[
+  {
+    "token": "sensor_lidar_top",
+    "channel": "LIDAR_TOP",
+    "modality": "lidar"
+  }
+]

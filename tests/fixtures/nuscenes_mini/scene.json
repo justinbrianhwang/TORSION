@@ -1,0 +1,9 @@
+[
+  {
+    "token": "scene_token_1",
+    "name": "fixture_scene_straight",
+    "first_sample_token": "sample_0",
+    "last_sample_token": "sample_2",
+    "nbr_samples": 3
+  }
+]

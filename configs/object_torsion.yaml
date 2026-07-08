@@ -1,0 +1,40 @@
+experiment:
+  name: object_torsion_cut_in
+  seed: 0
+  simulator: carla
+  scenario: cut_in_vehicle
+
+injection:
+  point: object_set
+  operator: yaw_position_torsion
+  magnitude: medium
+  temporal_pattern: burst
+  start_frame: 120
+  duration_frames: 5
+  target_actor: nearest_front_vehicle
+
+object_torsion:
+  delta_x: 0.5
+  delta_y: 0.3
+  delta_yaw_deg: 5.0
+  velocity_rotation_deg: 5.0
+  preserve_class: true
+  preserve_track_id: true
+  preserve_bbox_size: true
+
+metrics:
+  - collision_rate
+  - min_ttc
+  - min_actor_distance
+  - route_completion
+  - recovery_time
+
+logging:
+  save_replay: true
+  save_bev_overlay: true
+  save_trajectory: true
+  schema:
+    run_id: carla_cut_in_object_medium_seed0
+    simulator_version: 0.9.x
+    injection_point: object_set
+    temporal_pattern: burst

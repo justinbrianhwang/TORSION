@@ -1,0 +1,65 @@
+[
+  {
+    "token": "ann_car_0",
+    "sample_token": "sample_0",
+    "instance_token": "inst_car",
+    "translation": [10.0, 0.0, 0.0],
+    "size": [2.0, 4.0, 1.5],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "num_lidar_pts": 40,
+    "num_radar_pts": 0
+  },
+  {
+    "token": "ann_ped_0",
+    "sample_token": "sample_0",
+    "instance_token": "inst_pedestrian",
+    "translation": [0.0, 4.0, 0.0],
+    "size": [0.6, 0.8, 1.7],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "category_name": "human.pedestrian.adult",
+    "num_lidar_pts": 10,
+    "num_radar_pts": 0
+  },
+  {
+    "token": "ann_car_1",
+    "sample_token": "sample_1",
+    "instance_token": "inst_car",
+    "translation": [12.5, 0.0, 0.0],
+    "size": [2.0, 4.0, 1.5],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "num_lidar_pts": 50,
+    "num_radar_pts": 0
+  },
+  {
+    "token": "ann_ped_1",
+    "sample_token": "sample_1",
+    "instance_token": "inst_pedestrian",
+    "translation": [1.0, 4.0, 0.0],
+    "size": [0.6, 0.8, 1.7],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "category_name": "human.pedestrian.adult",
+    "num_lidar_pts": 10,
+    "num_radar_pts": 0
+  },
+  {
+    "token": "ann_car_2",
+    "sample_token": "sample_2",
+    "instance_token": "inst_car",
+    "translation": [15.0, 0.0, 0.0],
+    "size": [2.0, 4.0, 1.5],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "num_lidar_pts": 60,
+    "num_radar_pts": 0
+  },
+  {
+    "token": "ann_ped_2",
+    "sample_token": "sample_2",
+    "instance_token": "inst_pedestrian",
+    "translation": [2.0, 4.0, 0.0],
+    "size": [0.6, 0.8, 1.7],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "category_name": "human.pedestrian.adult",
+    "num_lidar_pts": 10,
+    "num_radar_pts": 0
+  }
+]

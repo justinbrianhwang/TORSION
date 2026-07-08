@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torsion"
+version = "0.1.0"
+description = "TORSION semantic fault injection research scaffold"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy",
+  "pyyaml",
+  "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+  "ignore::pytest.PytestCacheWarning",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["torsion*"]
+exclude = ["tests*", "carla*"]

@@ -1,0 +1,16 @@
+[
+  {
+    "token": "inst_car",
+    "category_token": "category_vehicle_car",
+    "nbr_annotations": 3,
+    "first_annotation_token": "ann_car_0",
+    "last_annotation_token": "ann_car_2"
+  },
+  {
+    "token": "inst_pedestrian",
+    "category_token": "category_pedestrian_adult",
+    "nbr_annotations": 3,
+    "first_annotation_token": "ann_ped_0",
+    "last_annotation_token": "ann_ped_2"
+  }
+]

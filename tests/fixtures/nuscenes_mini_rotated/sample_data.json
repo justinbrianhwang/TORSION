@@ -1,0 +1,32 @@
+[
+  {
+    "token": "sample_data_lidar_0",
+    "sample_token": "sample_0",
+    "ego_pose_token": "ego_0",
+    "calibrated_sensor_token": "calib_lidar_top",
+    "is_key_frame": true,
+    "filename": "samples/LIDAR_TOP/sample_0.pcd.bin",
+    "fileformat": "pcd",
+    "timestamp": 0
+  },
+  {
+    "token": "sample_data_lidar_1",
+    "sample_token": "sample_1",
+    "ego_pose_token": "ego_1",
+    "calibrated_sensor_token": "calib_lidar_top",
+    "is_key_frame": true,
+    "filename": "samples/LIDAR_TOP/sample_1.pcd.bin",
+    "fileformat": "pcd",
+    "timestamp": 500000
+  },
+  {
+    "token": "sample_data_lidar_2",
+    "sample_token": "sample_2",
+    "ego_pose_token": "ego_2",
+    "calibrated_sensor_token": "calib_lidar_top",
+    "is_key_frame": true,
+    "filename": "samples/LIDAR_TOP/sample_2.pcd.bin",
+    "fileformat": "pcd",
+    "timestamp": 1000000
+  }
+]

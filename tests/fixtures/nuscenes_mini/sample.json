@@ -1,0 +1,23 @@
+[
+  {
+    "token": "sample_0",
+    "scene_token": "scene_token_1",
+    "timestamp": 0,
+    "prev": "",
+    "next": "sample_1"
+  },
+  {
+    "token": "sample_1",
+    "scene_token": "scene_token_1",
+    "timestamp": 500000,
+    "prev": "sample_0",
+    "next": "sample_2"
+  },
+  {
+    "token": "sample_2",
+    "scene_token": "scene_token_1",
+    "timestamp": 1000000,
+    "prev": "sample_1",
+    "next": ""
+  }
+]
