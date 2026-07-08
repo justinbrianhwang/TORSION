@@ -9,7 +9,9 @@ representation boundaries *amplify* an error into a safety failure, which *atten
 > Fault injection is the **tool**; error propagation is the **observation**; characterization is the
 > **result**; (empirical) system identification is the **methodology**.
 
-![TORSION overview](TORSION.png)
+![Fault injection points in the autonomous-driving pipeline](assets/images/01-fault-injection-points.png)
+
+*TORSION injects a semantic fault at the output of **object tracking**, **prediction**, or the **cost-map** (red injection points) and measures how the error propagates downstream toward a safety outcome. The **sensors and the vehicle are never modified** — only the intermediate software representations are.*
 
 ---
 
@@ -31,6 +33,15 @@ structural facts hold in **both synthetic and real (nuPlan)** data:
 
 The per-boundary gains and their structural causes are tabulated in **[Key findings](#key-findings-honest--positive-and-negative)** below.
 
+### Method: the fault is an *excitation signal*
+
+TORSION treats the pipeline as an unknown dynamical system and the semantic fault as a **known
+excitation** `u_t` injected into it. By measuring the **response** `y_t` (safety metrics, interface
+gains) it performs *empirical system identification*: inferring which stage amplifies the signal and
+which attenuates it — without ever assuming a parametric model of the internals.
+
+![Semantic fault as an excitation signal for empirical system identification](assets/images/05-excitation-sysid.png)
+
 ---
 
 ## What is a "semantic fault"?
@@ -41,6 +52,13 @@ tracked object's position / velocity / heading. This models realistic errors (tr
 error, occupancy / segmentation error) and, unlike Gaussian noise or bit-flips (which *break* the contract
 and serve as baselines), the faulted representation stays a *valid* input, so its propagation can be
 observed.
+
+![Semantic fault (valid, contract-preserving) vs. corruption baseline (invalid)](assets/images/02-semantic-fault.png)
+
+*Left — a semantic fault shifts the tracked object's position/velocity but keeps it a **single valid
+object**; the representation contract holds, so the fault flows through the pipeline as a normal input.
+Right — Gaussian corruption shatters the object and breaks the contract; it is used only as a matched
+baseline.*
 
 ---
 
@@ -56,6 +74,21 @@ real CARLA (450 episodes), and **real nuPlan** (real HD map + real agents, 10,44
 | M1 | rasterization (→ cost-map) | attenuator | many-to-one grid projection | local Jacobian 0.02–0.04 ≪ 1 |
 | M2 | cost-map → plan | amplifier | **sampling-argmin decision-boundary switching** | min-margin quartile: plan deviation ×27, argmin-flip ×24, Spearman ρ=0.52 |
 | M3 | object → prediction | amplifier | constant-velocity integration over horizon | ∂pred/∂v = t; analytic = empirical; ∝ horizon |
+
+![Interface gains: which boundaries amplify vs. attenuate](assets/images/03-interface-gains.png)
+
+*The same input error is strongly **attenuated** by rasterization (gain ≈ 0.02–0.04), then sharply
+**amplified and clipped** by the cost-map→planner argmin (a switching nonlinearity), while
+object→prediction amplifies mildly and **linearly**.*
+
+The cost-map→plan amplification is a **decision-boundary switch**, not a smooth gain: a tiny cost-map
+perturbation can flip the planner's `argmin` from a straight trajectory to a hard swerve/brake.
+
+![argmin decision-boundary switching produces a phantom brake](assets/images/04-argmin-switching.png)
+
+*Mechanism M2: a tiny cost-map perturbation moves the global minimum from candidate 8 (straight) to
+candidate 13 (hard swerve/brake) — a discontinuous "phantom brake". This switching behaviour is why the
+cost-map is the most safety-critical interface.*
 
 **System characterization**
 
@@ -96,6 +129,7 @@ torsion/
 scripts/         run_* drivers for each experiment
 tests/           unit + integration tests
 configs/         experiment configs
+assets/images/   figures used in this README
 ```
 
 Framing / positioning write-up: `TORSION_framing.md`.
