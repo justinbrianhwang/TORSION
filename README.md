@@ -11,27 +11,25 @@ representation boundaries *amplify* an error into a safety failure, which *atten
 
 ![TORSION overview](TORSION.png)
 
-*(Conceptual overview. The precise pipeline studied and its measured interface gains are shown below.)*
-
 ---
 
-## The pipeline and its measured propagation response
+## Where in the autonomous-driving stack TORSION operates
 
-```
- Semantic Fault  (excitation — injected at a chosen representation)
-       │
-  [object] ──2.09──▶ [prediction] ──0.004──▶ [cost-map] ──10–40──▶ [plan] ──2.3──▶ [control] ──▶ Safety
-             amplify              attenuate               amplify            (linear)
-          (CV integration)    (rasterization)         (argmin switch)
-```
+A modern driving stack is a **cascade of representations**: raw sensors become a list of *tracked
+objects*, which become *predicted trajectories*, which are rasterized into a *cost-map*, from which a
+*planner* selects a trajectory that a *controller* executes. TORSION does not touch the sensors or the
+car — it **injects a semantic fault at one chosen representation boundary** and measures how far, and
+how strongly, that error travels down the rest of the cascade toward a safety outcome.
 
-Each arrow is an **interface gain** (>1 amplifies, <1 attenuates). Two structural facts hold in both
-synthetic and **real (nuPlan)** data:
+Each boundary has a measured **interface gain** (>1 amplifies an error, <1 attenuates it). Two
+structural facts hold in **both synthetic and real (nuPlan)** data:
 
 - **Rasterization boundaries attenuate** — projecting object/prediction state onto a grid is a
   many-to-one, kernel-limited map (local Jacobian ≈ 0.02–0.04 ≪ 1).
 - **The cost-map is the most safety-critical representation interface** — injecting there degrades safety
   far more than at the object stage, at matched budget.
+
+The per-boundary gains and their structural causes are tabulated in **[Key findings](#key-findings-honest--positive-and-negative)** below.
 
 ---
 
@@ -100,8 +98,7 @@ tests/           unit + integration tests
 configs/         experiment configs
 ```
 
-Design / results write-ups: `TORSION_experiment_design.md`, `TORSION_framing.md`,
-`TORSION_results_summary.md` (all numeric results, §4.1–4.14), `TORSION_발표정리.md` (talk summary).
+Framing / positioning write-up: `TORSION_framing.md`.
 
 ---
 
