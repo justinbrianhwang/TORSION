@@ -27,10 +27,10 @@ Each boundary has a measured **interface gain** (>1 amplifies an error, <1 atten
 structural facts hold in **both synthetic and real (nuPlan)** data:
 
 - **Rasterization boundaries attenuate** — projecting object/prediction state onto a grid is a
-  many-to-one, kernel-limited map (local Jacobian ≈ 0.02–0.04 ≪ 1).
+  many-to-one, kernel-limited map (local Jacobian ≈ 0.024–0.035 ≪ 1).
 - **The cost-map is the most safety-critical representation interface** — under a *matched perturbation
-  budget*, a semantic fault injected there ends in a **collision 11.9%** of the time, vs. 5.2% at the
-  object stage and 0.4% at prediction.
+  budget*, a semantic fault injected there ends in a **collision 23.9%** of the time, vs. 10.6% at the
+  object stage and 3.9% at prediction (high magnitude; CI-separated).
 
 The per-boundary gains and their structural causes are tabulated in **[Key findings](#key-findings-honest--positive-and-negative)** below.
 
@@ -72,22 +72,22 @@ real CARLA (450 episodes), and **real nuPlan** (real HD map + real agents, 10,44
 
 | Boundary | Gain | Behaviour | Response type |
 |---|---|---|---|
-| object → prediction | 1.3 – 1.9 | amplify | linear (gain CV 0.03) |
-| prediction → cost-map | **0.004** | **attenuate** | linear |
-| cost-map → plan | **6 – 9** | **amplify** | **nonlinear — switching (gain CV 0.26)** |
-| plan → control | 2.5 | amplify | linear (gain CV 0.07) |
+| object → prediction | 1.9 – 2.1 | amplify | linear (gain CV 0.03) |
+| prediction → cost-map | **0.010 – 0.017** | **attenuate** | linear |
+| cost-map → plan | **5.6 – 9.5** | **amplify** | **nonlinear — switching (gain CV 0.26)** |
+| plan → control | 2.4 – 2.8 | amplify | linear (gain CV 0.07) |
 
 **Mechanisms — *why* each boundary behaves as it does**
 
 | # | Boundary | Behaviour | Structural cause | Evidence |
 |---|----------|-----------|------------------|----------|
-| M1 | rasterization (→ cost-map) | attenuator | many-to-one grid projection | local Jacobian 0.027–0.038 ≪ 1 |
+| M1 | rasterization (→ cost-map) | attenuator | many-to-one grid projection | local Jacobian 0.024–0.035 ≪ 1 |
 | M2 | cost-map → plan | amplifier | **sampling-argmin decision-boundary switching** | min-margin quartile: plan deviation ×7.5, argmin-flip ×7.1, Spearman ρ=0.42 (6 scenarios, 5,400 frames) |
-| M3 | object → prediction | amplifier | constant-velocity integration over horizon | ∂pred/∂v = t; analytic = empirical to 7e-14 |
+| M3 | object → prediction | amplifier | constant-velocity integration over horizon | ∂pred/∂v = t; analytic = empirical to 8e-14 |
 
 ![Interface gains: which boundaries amplify vs. attenuate](assets/images/03-interface-gains.png)
 
-*The same input error is strongly **attenuated** by rasterization (gain ≈ 0.02–0.04), then sharply
+*The same input error is strongly **attenuated** by rasterization (two orders of magnitude), then sharply
 **amplified and clipped** by the cost-map→planner argmin (a switching nonlinearity), while
 object→prediction amplifies mildly and **linearly**.*
 
@@ -106,20 +106,39 @@ budget** — the outcome that matters — not by our own sensitivity metrics. At
 
 | Injection stage | **Collision rate [95% CI]** | Reach-safety | CIS (high) | CIS (all mag.) |
 |---|---|---|---|---|
-| object | 10.6%  [6.5, 16.0] | 0.34 | 0.53 | *0.68* |
-| prediction | 3.9%  [1.6, 7.8] | 0.34 | 0.33 | 0.50 |
-| **cost-map** | **23.9%  [17.9, 30.8]** | 0.27 | **0.64** | 0.61 |
+| object | 10.6%  [6.5, 16.0] | *0.26* | 0.45 | 0.65 |
+| prediction | 3.9%  [1.6, 7.8] | 0.18 | 0.17 | 0.26 |
+| **cost-map** | **23.9%  [17.9, 30.8]** | 0.25 | **0.56** | **0.73** |
 
 Cost-map's lower bound (17.9) exceeds object's upper bound (16.0) — **CI-separated**, not merely ordered.
 Cost-map ranks first in **5 of 6 scenarios**; the exception is `oncoming_drift`, where *prediction* faults
 dominate (short time-to-conflict makes misprediction the hazard).
 
-> **Honest caveats.** (1) The ranking is a **high-magnitude** statement — at low/medium magnitude faults
-> essentially never collide, so there is no ranking to make. (2) The metrics *disagree*: CIS averaged over
-> magnitudes ranks **object** first, and reach-safety ranks cost-map **last**. Read correctly this is not a
-> contradiction — cost-map faults reach a safety outcome *less often* but are far more likely to be
-> *catastrophic when they do*. We lead with collision rate and show all four rather than only the one that
-> flatters the claim.
+**The ranking is robust to how the budget is matched.** Re-ranked under 4 different matching rules
+(operator magnitude, delivered plan deviation, delivered cost perturbation, delivered control deviation) —
+cost-map is first, CI-separated, in **all four**.
+
+### 🔑 Directedness is what makes the critical interface *visible*
+
+Under a **random** contract-preserving warp of **equal budget**, the ranking **disappears entirely**:
+
+| | cost-map | object | prediction |
+|---|---|---|---|
+| **directed** (semantic fault) | **23.9%** | 10.6% | 3.9% |
+| **random** (same budget) | 12.2% | *13.3%* | 8.3% |
+
+The stages become statistically indistinguishable and cost-map isn't even first. Directedness matters
+**only at the cost-map**: directed nearly doubles collisions there (23.9% vs 12.2%, Fisher p=0.006), while
+at object and prediction it makes no difference (p=0.52, p=0.12).
+
+> **The semantic fault is not a stylistic preference over Gaussian noise — it is what makes the critical
+> interface observable at all.** An undirected robustness study of this pipeline, however carefully
+> budgeted, would have concluded the three stages are equally critical.
+
+> **Honest caveat:** the ranking is a **high-magnitude** statement — at low/medium magnitude faults
+> essentially never collide, so there is no ranking to make. Reach-safety rate ranks object marginally
+> first (0.26 vs 0.25 — a tie), which is correct: cost-map faults don't *arrive* more often, they're more
+> *catastrophic on arrival*.
 
 **System characterization**
 
