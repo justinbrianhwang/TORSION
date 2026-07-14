@@ -47,6 +47,34 @@ SCENARIO_INSTANCE_RANGES: dict[str, dict[str, tuple[float, float]]] = {
         "actor_heading_rad": (float(np.deg2rad(86.0)), float(np.deg2rad(94.0))),
         "crossing_start_s": (0.6, 1.2),
     },
+    "stopped_obstacle": {
+        "ego_speed_mps": (11.0, 13.0),
+        "actor_x0_m": (30.0, 38.0),
+        "actor_y0_m": (-0.25, 0.25),
+    },
+    "oncoming_drift": {
+        "ego_speed_mps": (10.5, 12.5),
+        "actor_x0_m": (46.0, 56.0),
+        "actor_y0_m": (3.2, 3.9),
+        "actor_speed_mps": (8.0, 10.5),
+        "drift_trigger_s": (0.4, 1.2),
+        "drift_lateral_speed_mps": (-0.75, -0.45),
+    },
+    # Dense scene: the ego is boxed in by a lead vehicle and two flanking
+    # vehicles.  Most planner candidates are infeasible, so the surviving cost
+    # minimum is well separated -- the regime in which we predict argmin
+    # switching should NOT occur (see the gateway-collapse hypothesis).
+    "dense_traffic": {
+        "ego_speed_mps": (10.0, 12.0),
+        "lead_x0_m": (18.0, 24.0),
+        "lead_speed_mps": (6.5, 8.5),
+        "lead_decel_mps2": (1.8, 2.8),
+        "left_x0_m": (8.0, 14.0),
+        "left_speed_mps": (10.0, 12.5),
+        "right_x0_m": (9.0, 15.0),
+        "right_speed_mps": (9.5, 12.0),
+        "lane_offset_m": (3.2, 3.6),
+    },
 }
 
 OBSERVATION_NOISE_RANGES = {
@@ -409,11 +437,240 @@ def pedestrian_crossing(
     )
 
 
+def stopped_obstacle(
+    *,
+    dt: float = 0.1,
+    steps: int = 90,
+    ego_speed_mps: float = 12.0,
+    seed: int | None = None,
+    observation_noise_xy_sigma_m: float = OBSERVATION_NOISE_RANGES["xy_sigma_m"],
+    observation_noise_velocity_sigma_mps: float = OBSERVATION_NOISE_RANGES[
+        "velocity_sigma_mps"
+    ],
+    observation_noise_yaw_sigma_rad: float = OBSERVATION_NOISE_RANGES["yaw_sigma_rad"],
+) -> SyntheticScenario:
+    """Stationary vehicle blocking the ego lane.
+
+    Unlike ``leading_vehicle`` the obstacle never moves, so a velocity fault
+    carries no information and only a position fault can displace it.  This
+    separates position-semantics from velocity-semantics in the taxonomy.
+    """
+
+    params = _sample_parameters("stopped_obstacle", seed) if seed is not None else {
+        "ego_speed_mps": ego_speed_mps,
+        "actor_x0_m": 34.0,
+        "actor_y0_m": 0.0,
+    }
+    params.setdefault("ego_speed_mps", ego_speed_mps)
+
+    x = np.full(steps, params["actor_x0_m"], dtype=np.float64)
+    y = np.full(steps, params["actor_y0_m"], dtype=np.float64)
+    vx = np.zeros(steps, dtype=np.float64)
+    vy = np.zeros(steps, dtype=np.float64)
+    actor = ScriptedActorTrajectory(
+        track_id="stopped_vehicle",
+        cls="vehicle",
+        x=x,
+        y=y,
+        yaw=_yaw_from_velocity(vx, vy),
+        vx=vx,
+        vy=vy,
+        width=2.0,
+        height=1.6,
+        length=4.5,
+    )
+    return SyntheticScenario(
+        scenario_id="stopped_obstacle",
+        dt=dt,
+        steps=steps,
+        ego_initial=EgoState(x=0.0, y=0.0, yaw=0.0, speed=params["ego_speed_mps"]),
+        actors=(actor,),
+        primary_actor_id=actor.track_id,
+        route_length_m=95.0,
+        description="stationary vehicle blocks the ego lane",
+        sample_seed=seed,
+        sample_parameters=_parameter_tuple(params),
+        observation_noise_xy_sigma_m=observation_noise_xy_sigma_m,
+        observation_noise_velocity_sigma_mps=observation_noise_velocity_sigma_mps,
+        observation_noise_yaw_sigma_rad=observation_noise_yaw_sigma_rad,
+    )
+
+
+def oncoming_drift(
+    *,
+    dt: float = 0.1,
+    steps: int = 90,
+    ego_speed_mps: float = 11.5,
+    seed: int | None = None,
+    observation_noise_xy_sigma_m: float = OBSERVATION_NOISE_RANGES["xy_sigma_m"],
+    observation_noise_velocity_sigma_mps: float = OBSERVATION_NOISE_RANGES[
+        "velocity_sigma_mps"
+    ],
+    observation_noise_yaw_sigma_rad: float = OBSERVATION_NOISE_RANGES["yaw_sigma_rad"],
+) -> SyntheticScenario:
+    """Oncoming vehicle drifts out of its lane toward the ego lane.
+
+    Closing speed is the sum of both speeds, so the time-to-conflict is short
+    and a heading/velocity fault matters more than in same-direction scenarios.
+    """
+
+    params = _sample_parameters("oncoming_drift", seed) if seed is not None else {
+        "ego_speed_mps": ego_speed_mps,
+        "actor_x0_m": 50.0,
+        "actor_y0_m": 3.5,
+        "actor_speed_mps": 9.0,
+        "drift_trigger_s": 0.8,
+        "drift_lateral_speed_mps": -0.6,
+    }
+    params.setdefault("ego_speed_mps", ego_speed_mps)
+
+    x = np.empty(steps, dtype=np.float64)
+    y = np.empty(steps, dtype=np.float64)
+    vx = np.empty(steps, dtype=np.float64)
+    vy = np.empty(steps, dtype=np.float64)
+    x[0] = params["actor_x0_m"]
+    y[0] = params["actor_y0_m"]
+    base_vx = -params["actor_speed_mps"]  # travelling toward the ego
+    for frame in range(steps):
+        if frame > 0:
+            x[frame] = x[frame - 1] + vx[frame - 1] * dt
+            y[frame] = y[frame - 1] + vy[frame - 1] * dt
+        vx[frame] = base_vx
+        drifting = frame * dt >= params["drift_trigger_s"] and y[frame] > 0.0
+        vy[frame] = params["drift_lateral_speed_mps"] if drifting else 0.0
+    actor = ScriptedActorTrajectory(
+        track_id="oncoming_vehicle",
+        cls="vehicle",
+        x=x,
+        y=y,
+        yaw=_yaw_from_velocity(vx, vy),
+        vx=vx,
+        vy=vy,
+        width=2.0,
+        height=1.6,
+        length=4.5,
+    )
+    return SyntheticScenario(
+        scenario_id="oncoming_drift",
+        dt=dt,
+        steps=steps,
+        ego_initial=EgoState(x=0.0, y=0.0, yaw=0.0, speed=params["ego_speed_mps"]),
+        actors=(actor,),
+        primary_actor_id=actor.track_id,
+        route_length_m=95.0,
+        description="oncoming vehicle drifts toward the ego lane",
+        sample_seed=seed,
+        sample_parameters=_parameter_tuple(params),
+        observation_noise_xy_sigma_m=observation_noise_xy_sigma_m,
+        observation_noise_velocity_sigma_mps=observation_noise_velocity_sigma_mps,
+        observation_noise_yaw_sigma_rad=observation_noise_yaw_sigma_rad,
+    )
+
+
+def dense_traffic(
+    *,
+    dt: float = 0.1,
+    steps: int = 90,
+    ego_speed_mps: float = 11.0,
+    seed: int | None = None,
+    observation_noise_xy_sigma_m: float = OBSERVATION_NOISE_RANGES["xy_sigma_m"],
+    observation_noise_velocity_sigma_mps: float = OBSERVATION_NOISE_RANGES[
+        "velocity_sigma_mps"
+    ],
+    observation_noise_yaw_sigma_rad: float = OBSERVATION_NOISE_RANGES["yaw_sigma_rad"],
+) -> SyntheticScenario:
+    """Ego boxed in by a braking lead vehicle and two flanking vehicles.
+
+    This is the *dense* counterpart to the single-actor scenarios, and it exists
+    to test the gateway-collapse hypothesis directly: if the planner-switch
+    mechanism is a property of shallow, near-degenerate cost landscapes, then a
+    scene where the flanking lanes are occupied -- and most candidates are
+    therefore infeasible -- should show a *larger* decision margin and a *lower*
+    argmin-flip rate than the sparse scenarios, under the same fault budget.
+    """
+
+    params = _sample_parameters("dense_traffic", seed) if seed is not None else {
+        "ego_speed_mps": ego_speed_mps,
+        "lead_x0_m": 21.0,
+        "lead_speed_mps": 7.5,
+        "lead_decel_mps2": 2.3,
+        "left_x0_m": 11.0,
+        "left_speed_mps": 11.2,
+        "right_x0_m": 12.0,
+        "right_speed_mps": 10.8,
+        "lane_offset_m": 3.4,
+    }
+    params.setdefault("ego_speed_mps", ego_speed_mps)
+    offset = params["lane_offset_m"]
+
+    def _straight(x0: float, y0: float, speed: float, decel: float = 0.0):
+        x = np.empty(steps, dtype=np.float64)
+        y = np.full(steps, y0, dtype=np.float64)
+        vx = np.empty(steps, dtype=np.float64)
+        vy = np.zeros(steps, dtype=np.float64)
+        x[0] = x0
+        v = speed
+        vx[0] = v
+        for frame in range(1, steps):
+            x[frame] = x[frame - 1] + vx[frame - 1] * dt
+            if decel > 0.0 and (frame - 1) * dt >= 0.8:
+                v = max(2.0, v - decel * dt)
+            vx[frame] = v
+        return x, y, vx, vy
+
+    specs = [
+        ("lead_vehicle", params["lead_x0_m"], 0.0, params["lead_speed_mps"], params["lead_decel_mps2"]),
+        ("left_vehicle", params["left_x0_m"], offset, params["left_speed_mps"], 0.0),
+        ("right_vehicle", params["right_x0_m"], -offset, params["right_speed_mps"], 0.0),
+    ]
+    actors = []
+    for track_id, x0, y0, speed, decel in specs:
+        x, y, vx, vy = _straight(x0, y0, speed, decel)
+        actors.append(
+            ScriptedActorTrajectory(
+                track_id=track_id,
+                cls="vehicle",
+                x=x,
+                y=y,
+                yaw=_yaw_from_velocity(vx, vy),
+                vx=vx,
+                vy=vy,
+                width=2.0,
+                height=1.6,
+                length=4.5,
+            )
+        )
+    return SyntheticScenario(
+        scenario_id="dense_traffic",
+        dt=dt,
+        steps=steps,
+        ego_initial=EgoState(x=0.0, y=0.0, yaw=0.0, speed=params["ego_speed_mps"]),
+        actors=tuple(actors),
+        primary_actor_id="lead_vehicle",
+        route_length_m=95.0,
+        description="ego boxed in by a braking lead vehicle and two flanking vehicles",
+        sample_seed=seed,
+        sample_parameters=_parameter_tuple(params),
+        observation_noise_xy_sigma_m=observation_noise_xy_sigma_m,
+        observation_noise_velocity_sigma_mps=observation_noise_velocity_sigma_mps,
+        observation_noise_yaw_sigma_rad=observation_noise_yaw_sigma_rad,
+    )
+
+
 SCENARIOS: dict[str, ScenarioFactory] = {
     "cut_in": cut_in,
     "leading_vehicle": leading_vehicle,
     "pedestrian_crossing": pedestrian_crossing,
+    "stopped_obstacle": stopped_obstacle,
+    "oncoming_drift": oncoming_drift,
+    "dense_traffic": dense_traffic,
 }
+
+# Scenes with a single actor leave most planner candidates feasible (a shallow
+# cost landscape); dense_traffic occupies the flanking lanes.  The propagation
+# analysis uses this split to test the gateway-collapse hypothesis.
+SPARSE_SCENARIOS = ("cut_in", "leading_vehicle", "pedestrian_crossing", "stopped_obstacle", "oncoming_drift")
+DENSE_SCENARIOS = ("dense_traffic",)
 
 
 def get_scenario(name: str, **kwargs: Any) -> SyntheticScenario:

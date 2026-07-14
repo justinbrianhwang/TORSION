@@ -540,6 +540,17 @@ def _decision_margin_row(
     return out
 
 
+def decision_margin(clean_plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Cost margin between the planner's best and second-best candidate.
+
+    Public entry point so callers outside the synthetic harness -- notably the
+    nuPlan runner -- can log the same margin the M2 analysis uses, which is what
+    lets the gateway-collapse hypothesis be tested on real data.
+    """
+
+    return _decision_margin(clean_plan)
+
+
 def _decision_margin(clean_plan: Mapping[str, Any]) -> dict[str, Any]:
     alternatives = list(clean_plan.get("alternatives", ()))
     if len(alternatives) < 2:
@@ -720,6 +731,7 @@ def _is_finite_number(value: Any) -> bool:
 
 __all__ = [
     "DEFAULT_EPS_SWEEP",
+    "decision_margin",
     "decision_margin_analysis",
     "prediction_jacobian",
     "rasterization_jacobian",

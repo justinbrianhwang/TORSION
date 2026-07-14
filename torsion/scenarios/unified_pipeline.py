@@ -70,7 +70,14 @@ UnifiedMethodName = Literal[
     "inflation",
 ]
 
-SCENARIOS: tuple[str, ...] = ("cut_in", "leading_vehicle", "pedestrian_crossing")
+SCENARIOS: tuple[str, ...] = (
+    "cut_in",
+    "leading_vehicle",
+    "pedestrian_crossing",
+    "stopped_obstacle",
+    "oncoming_drift",
+    "dense_traffic",
+)
 INJECTION_POINTS: tuple[str, ...] = ("object", "costmap")
 MAGNITUDES: tuple[str, ...] = ("low", "medium", "high")
 MAGNITUDE_PATH_BUDGETS_M: dict[str, float] = {

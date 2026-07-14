@@ -28,8 +28,9 @@ structural facts hold in **both synthetic and real (nuPlan)** data:
 
 - **Rasterization boundaries attenuate** — projecting object/prediction state onto a grid is a
   many-to-one, kernel-limited map (local Jacobian ≈ 0.02–0.04 ≪ 1).
-- **The cost-map is the most safety-critical representation interface** — injecting there degrades safety
-  far more than at the object stage, at matched budget.
+- **The cost-map is the most safety-critical representation interface** — under a *matched perturbation
+  budget*, a semantic fault injected there ends in a **collision 11.9%** of the time, vs. 5.2% at the
+  object stage and 0.4% at prediction.
 
 The per-boundary gains and their structural causes are tabulated in **[Key findings](#key-findings-honest--positive-and-negative)** below.
 
@@ -80,9 +81,9 @@ real CARLA (450 episodes), and **real nuPlan** (real HD map + real agents, 10,44
 
 | # | Boundary | Behaviour | Structural cause | Evidence |
 |---|----------|-----------|------------------|----------|
-| M1 | rasterization (→ cost-map) | attenuator | many-to-one grid projection | local Jacobian 0.02–0.04 ≪ 1 |
-| M2 | cost-map → plan | amplifier | **sampling-argmin decision-boundary switching** | min-margin quartile: plan deviation ×27, argmin-flip ×24, Spearman ρ=0.52 |
-| M3 | object → prediction | amplifier | constant-velocity integration over horizon | ∂pred/∂v = t; analytic = empirical; ∝ horizon |
+| M1 | rasterization (→ cost-map) | attenuator | many-to-one grid projection | local Jacobian 0.027–0.038 ≪ 1 |
+| M2 | cost-map → plan | amplifier | **sampling-argmin decision-boundary switching** | min-margin quartile: plan deviation ×7.5, argmin-flip ×7.1, Spearman ρ=0.42 (6 scenarios, 5,400 frames) |
+| M3 | object → prediction | amplifier | constant-velocity integration over horizon | ∂pred/∂v = t; analytic = empirical to 7e-14 |
 
 ![Interface gains: which boundaries amplify vs. attenuate](assets/images/03-interface-gains.png)
 
@@ -99,14 +100,34 @@ perturbation can flip the planner's `argmin` from a straight trajectory to a har
 candidate 13 (hard swerve/brake) — a discontinuous "phantom brake". This switching behaviour is why the
 cost-map is the most safety-critical interface.*
 
+**Which interface is most safety-critical?** We rank by **collision rate under a matched perturbation
+budget** — the outcome that matters — not by our own sensitivity metrics. At **high fault magnitude**
+(the regime where collisions occur), across **6 scenarios, n=180/stage**:
+
+| Injection stage | **Collision rate [95% CI]** | Reach-safety | CIS (high) | CIS (all mag.) |
+|---|---|---|---|---|
+| object | 10.6%  [6.5, 16.0] | 0.34 | 0.53 | *0.68* |
+| prediction | 3.9%  [1.6, 7.8] | 0.34 | 0.33 | 0.50 |
+| **cost-map** | **23.9%  [17.9, 30.8]** | 0.27 | **0.64** | 0.61 |
+
+Cost-map's lower bound (17.9) exceeds object's upper bound (16.0) — **CI-separated**, not merely ordered.
+Cost-map ranks first in **5 of 6 scenarios**; the exception is `oncoming_drift`, where *prediction* faults
+dominate (short time-to-conflict makes misprediction the hazard).
+
+> **Honest caveats.** (1) The ranking is a **high-magnitude** statement — at low/medium magnitude faults
+> essentially never collide, so there is no ranking to make. (2) The metrics *disagree*: CIS averaged over
+> magnitudes ranks **object** first, and reach-safety ranks cost-map **last**. Read correctly this is not a
+> contradiction — cost-map faults reach a safety outcome *less often* but are far more likely to be
+> *catastrophic when they do*. We lead with collision rate and show all four rather than only the one that
+> flatters the claim.
+
 **System characterization**
 
 - **Propagation response (amplitude sweep):** `cost→plan` is a *nonlinear* switching element; `plan→control`
   and `object→prediction` are *linear* elements. The pipeline is a cascade of linear transfer elements with the
   **planner (argmin) as the critical nonlinearity**.
-- **Failure taxonomy (810 runs):** across every fault origin, **88.9%** of faults route through a planner
-  switch; the dominant induced failure is a phantom / hard brake (76–85% of all faults); collision rate is
-  highest for cost-map faults (11.9%) > object (5.2%) > prediction (0.4%).
+- **Failure taxonomy (1,620 runs, 6 scenarios):** across every fault origin, **~92%** of faults route
+  through a planner switch; the dominant induced failure is a phantom / hard brake (74–88%).
 - **Causal control:** softening the planner's selection (argmin → softmax, T=0.02) cuts switching by 36%
   (0.89 → 0.57) and drives object / cost-map collisions to **0** — *discrete selection amplifies*.
   **But this is a trade-off, not a free win:** prediction-origin collisions *rise* (0.6% → 2.8%, and to
@@ -117,7 +138,7 @@ cost-map is the most safety-critical interface.*
 | Claim | Reproduces on real data? |
 |-------|--------------------------|
 | Rasterization attenuates (object→cost gain ≪ 1) | **Yes** — robust, all scenario categories |
-| Cost-map is the most safety-critical interface | **Yes** — robust, all categories |
+| Cost-map is the most safety-critical interface (by collision rate) | **Yes** — robust, all categories |
 | Planner amplifies (cost→plan > 1) | Partial — car-following 2.80, but intersection 0.83 and lane-change 0.11 (**attenuates**) |
 | Planner-switch is a "universal gateway" | **No** — argmin-flip collapses 0.89 (sparse) → 0.03–0.14 (dense real) |
 | Directed > random in raw strength | **No** — the robust distinction is *consistency*, not strength |
@@ -125,6 +146,28 @@ cost-map is the most safety-critical interface.*
 > The **core characterization (rasterization = attenuator, cost-map = most-critical interface) generalizes
 > to real data.** The planner-switch "gateway" is a mechanism observed in **sparse / argmin-planner** settings,
 > not a universal law. These bounds are stated explicitly rather than overclaimed.
+
+**A hypothesis we tested and rejected.** The obvious reason the gateway collapses on real data is *scene
+density*: dense scenes make most planner candidates infeasible → the surviving minimum is well separated →
+the argmin can't flip. We built a controlled dense scenario (`dense_traffic`: ego boxed in by a braking
+lead + two flanking vehicles) and **the middle step fails.**
+
+| | feasible candidates | decision margin | **argmin flip** |
+|---|---|---|---|
+| `dense_traffic` | **4.9 / 23** | 0.0060 | **0.29** |
+| `leading_vehicle` | 5.3 / 23 | **0.0331** | **0.00** |
+| sparse (avg) | 13.9 / 23 | 0.0043 | 0.25 |
+
+Density constrains the candidate set as designed (4.9/23) and does raise the median margin (1.39×,
+p=3e-7) — but **flips do not fall** (0.29 vs 0.25). The decisive contrast is `dense_traffic` vs
+`leading_vehicle`: *equally constrained* (~5 feasible), yet only `leading_vehicle` never flips — its margin
+is 5.5× larger. Across scenarios, flip rate tracks **margin** (ρ = −0.77), not feasible-candidate count
+(ρ = +0.60, wrong sign).
+
+> **Constraining the feasible set does not, by itself, separate the surviving candidates' costs.** The
+> quantity governing argmin switching is the **decision margin**; scene density is not a reliable proxy for
+> it. We withdraw the density explanation. M2 (margin governs switching) is untouched — and now holds
+> across six scenarios.
 
 ---
 
@@ -174,6 +217,7 @@ nuPlan / nuScenes datasets are obtained separately and placed locally.
 ## Status
 
 Research code accompanying an in-progress paper. Target venues: IEEE T-ITS / T-IV.
-Findings are reported with their honest scope; the metrics (interface gain, FAR, CIS, reach-safety) are
-analysis tools defined for this framework, used to *observe* the reported phenomena — not claimed as general
-laws.
+Findings are reported with their honest scope. Interfaces are ranked by **collision rate**; the metrics we
+define for this framework (interface gain, FAR, CIS, reach-safety) are analysis tools used to *observe* and
+*explain* the phenomena — they are not claimed as general laws, and where they disagree with the collision
+ranking we say so rather than reporting only the agreeing one.

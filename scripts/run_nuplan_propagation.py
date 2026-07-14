@@ -42,6 +42,7 @@ from torsion.data.nuplan_map import (  # noqa: E402
     map_path_for_log,
     road_boundary_mask_from_map,
 )
+from torsion.analysis.mechanism import decision_margin  # noqa: E402
 from torsion.metrics.statistics import bootstrap_ci  # noqa: E402
 from torsion.operators.costmap import COST_MAX, COST_MIN, spatial_cost_warp, translate_cost_field  # noqa: E402
 from torsion.operators.object import (  # noqa: E402
@@ -119,6 +120,10 @@ RUN_COLUMNS: tuple[str, ...] = (
     "cost__plan_gain",
     "argmin_flip",
     "planner_gateway",
+    "decision_margin_score",
+    "n_candidates",
+    "n_feasible",
+    "decision_margin_pool",
     "safety1_plan_dev",
     "clean_min_dist_m",
     "fault_min_dist_m",
@@ -149,6 +154,14 @@ SUMMARY_COLUMNS: tuple[str, ...] = (
     "cost__plan_gain_ci_high",
     "gateway_rate",
     "argmin_flip_rate",
+    "decision_margin_score_n",
+    "decision_margin_score_mean",
+    "decision_margin_score_ci_low",
+    "decision_margin_score_ci_high",
+    "n_feasible_n",
+    "n_feasible_mean",
+    "n_feasible_ci_low",
+    "n_feasible_ci_high",
     "safety1_plan_dev_n",
     "safety1_plan_dev_mean",
     "safety1_plan_dev_ci_low",
@@ -288,6 +301,8 @@ def summarize_runs(
         _add_mean_ci(record, group, "cost__plan_gain", cfg=cfg)
         record["gateway_rate"] = _mean_bool(group, "planner_gateway")
         record["argmin_flip_rate"] = _mean_bool(group, "argmin_flip")
+        _add_mean_ci(record, group, "decision_margin_score", cfg=cfg)
+        _add_mean_ci(record, group, "n_feasible", cfg=cfg)
         _add_mean_ci(record, group, "safety1_plan_dev", cfg=cfg)
         _add_mean_ci(record, group, "safety2_mindist_drop", cfg=cfg)
         _add_mean_ci(record, group, "safety2_ttc_drop", cfg=cfg)
@@ -878,6 +893,12 @@ def _condition_metrics(
     fault_safety = planned_path_safety(fault_plan.path_xy, real_objects, horizon_s=horizon_s)
     mindist_drop = _finite_difference(clean_safety.min_distance_m, fault_safety.min_distance_m)
     ttc_drop = _finite_difference(clean_safety.cv_ttc_s, fault_safety.cv_ttc_s)
+
+    # Log the clean plan's decision margin so the gateway-collapse hypothesis --
+    # "dense scenes have well-separated cost minima, so the argmin cannot flip" --
+    # can be tested on real data instead of only asserted.
+    margin = decision_margin(clean_plan.to_record())
+
     return {
         "object_shift_m": float(object_shift_m),
         "cost_l2": cost_l2,
@@ -886,6 +907,10 @@ def _condition_metrics(
         "cost__plan_gain": cost_plan_gain,
         "argmin_flip": argmin_flip,
         "planner_gateway": planner_gateway,
+        "decision_margin_score": margin["decision_margin_score"],
+        "n_candidates": margin["n_candidates"],
+        "n_feasible": margin["n_feasible"],
+        "decision_margin_pool": margin["decision_margin_pool"],
         "safety1_plan_dev": plan_dev,
         "clean_min_dist_m": clean_safety.min_distance_m,
         "fault_min_dist_m": fault_safety.min_distance_m,
