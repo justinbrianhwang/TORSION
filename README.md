@@ -145,22 +145,23 @@ dominate (short time-to-conflict makes misprediction the hazard).
 | Directed > random in raw strength | **No** — the robust distinction is *consistency*, not strength |
 | Switching is exclusive to argmin planners | **No** — potential-field gateway (0.30) *exceeds* sampling (0.23) |
 
-### 🐛 A negative result that turned out to be a bug
+### Benchmark validity: report the feasible set
 
-We previously reported that the switching pathway **fails to generalize** (argmin-flip collapsing to
-0.03–0.14, cost→plan *attenuating* at intersections). **It was wrong.**
+Every planner-based metric here — cost→plan gain, argmin-flip rate, decision margin, the switching pathway
+— presupposes the planner has a **genuine choice**. If the cost map admits no collision-free candidate, the
+planner doesn't select; it falls back, and every one of those metrics silently changes meaning.
 
-Our real cost map built the drivable surface from nuPlan's `lanes_polygons` layer alone — but nuPlan stores
-the area a vehicle traverses **through an intersection** in a separate lane-connector layer. Inside an
-intersection the ego lies outside every lane polygon, so the whole grid scored as hard off-road and
-**every planner candidate "collided"** (`n_feasible` = 0 at intersections, 1.04/17 overall; planner stuck
-in fallback 92% of the time). Composing both layers restores a sane operating point (`n_feasible` = 10.7/17,
-fallback 92% → 16%) — and both negative findings reverse.
+This is easy to violate on real data and hard to notice: an incomplete set of map layers, a slightly large
+obstacle inflation, or a conservative collision threshold will each make the *entire* candidate set
+infeasible exactly where it matters (dense intersections, tight gaps) while leaving open-road frames
+untouched. The numbers aren't noisy — they're confidently wrong, and they fail in a **seductive direction**:
+the planner stops switching, amplification appears to vanish, and you get a clean, plausible *"the
+simulation result doesn't generalize to real data"* — a conclusion the field is primed to believe.
 
-> **We keep this in the paper rather than quietly fixing it.** A harness that silently makes every action
-> infeasible doesn't announce itself — it produces a plausible, publishable *"does not generalize"* result,
-> and the more you expect simulation to be fragile, the more readily you believe it. Reporting
-> `n_feasible` alongside any planner-based robustness metric is cheap insurance.
+> The check is nearly free. We report **`n_feasible` = 10.7 / 17** candidates (11.6 at intersections),
+> confirming the planner is *choosing*, not falling back. Our drivable surface composes nuPlan's
+> `lanes_polygons` **and** `gen_lane_connectors_scaled_width_polygons` — the latter carries the area a
+> vehicle traverses *through an intersection*, where the ego lies outside every lane polygon.
 
 **A hypothesis we tested and rejected.** The obvious reason the gateway collapses on real data is *scene
 density*: dense scenes make most planner candidates infeasible → the surviving minimum is well separated →
