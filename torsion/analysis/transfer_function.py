@@ -90,6 +90,12 @@ def characterize_linearity(
     ``abs(normalized_slope) < 0.25``.  The normalized slope is
     ``gain_slope * mean_budget / mean_gain``.  CV uses ``abs(mean_gain)`` in the
     denominator so it remains nonnegative for signed gains.
+
+    When linearity cannot be assessed at all -- fewer than two finite
+    (budget, gain) samples, or a mean gain too close to zero to normalize by --
+    the verdict is ``undetermined``.  This is the case for an interface that
+    lies upstream of the injection point, which carries no gain to measure.
+    Reporting those as ``nonlinear`` would be a false positive.
     """
 
     _validate_threshold(cv_threshold, name="cv_threshold")
@@ -106,7 +112,7 @@ def characterize_linearity(
             "normalized_slope": None,
             "norm_slope": None,
             "monotonic": False,
-            "verdict": "nonlinear",
+            "verdict": "undetermined",
         }
 
     budgets = np.asarray([budget for budget, _ in pairs], dtype=np.float64)
@@ -126,17 +132,18 @@ def characterize_linearity(
         else None
     )
     monotonic = _is_monotonic(gains)
-    verdict = (
-        "linear"
-        if (
-            len(pairs) >= 2
-            and gain_cv is not None
-            and normalized_slope is not None
-            and gain_cv < float(cv_threshold)
-            and abs(normalized_slope) < float(normalized_slope_threshold)
-        )
-        else "nonlinear"
+    assessable = (
+        len(pairs) >= 2 and gain_cv is not None and normalized_slope is not None
     )
+    if not assessable:
+        verdict = "undetermined"
+    elif (
+        gain_cv < float(cv_threshold)
+        and abs(normalized_slope) < float(normalized_slope_threshold)
+    ):
+        verdict = "linear"
+    else:
+        verdict = "nonlinear"
     return {
         "mean_gain": mean_gain,
         "gain_cv": gain_cv,

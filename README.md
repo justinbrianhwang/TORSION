@@ -67,6 +67,15 @@ baseline.*
 Measured on a shared synthetic closed-loop harness (30 seeds), a real learned model (InterFuser BEV),
 real CARLA (450 episodes), and **real nuPlan** (real HD map + real agents, 10,440 runs).
 
+**Measured interface gains** (6-stage pipeline, across fault magnitudes; >1 amplifies, <1 attenuates)
+
+| Boundary | Gain | Behaviour | Response type |
+|---|---|---|---|
+| object → prediction | 1.3 – 1.9 | amplify | linear (gain CV 0.03) |
+| prediction → cost-map | **0.004** | **attenuate** | linear |
+| cost-map → plan | **6 – 9** | **amplify** | **nonlinear — switching (gain CV 0.26)** |
+| plan → control | 2.5 | amplify | linear (gain CV 0.07) |
+
 **Mechanisms — *why* each boundary behaves as it does**
 
 | # | Boundary | Behaviour | Structural cause | Evidence |
@@ -95,11 +104,13 @@ cost-map is the most safety-critical interface.*
 - **Propagation response (amplitude sweep):** `cost→plan` is a *nonlinear* switching element; `plan→control`
   and `object→prediction` are *linear* elements. The pipeline is a cascade of linear transfer elements with the
   **planner (argmin) as the critical nonlinearity**.
-- **Failure taxonomy (810 runs):** across every fault origin, ~76–85% of faults route through a planner
-  switch; the dominant induced failure is a phantom / hard brake; collision rate is highest for cost-map faults
-  (11.9%) > object (5.2%) > prediction (0.4%).
-- **Causal control:** softening the planner's selection (argmin → softmax) cuts switching by 36% and drives
-  object / cost-map collisions to ~0 — **discrete selection amplifies, continuous selection is safer.**
+- **Failure taxonomy (810 runs):** across every fault origin, **88.9%** of faults route through a planner
+  switch; the dominant induced failure is a phantom / hard brake (76–85% of all faults); collision rate is
+  highest for cost-map faults (11.9%) > object (5.2%) > prediction (0.4%).
+- **Causal control:** softening the planner's selection (argmin → softmax, T=0.02) cuts switching by 36%
+  (0.89 → 0.57) and drives object / cost-map collisions to **0** — *discrete selection amplifies*.
+  **But this is a trade-off, not a free win:** prediction-origin collisions *rise* (0.6% → 2.8%, and to
+  14.4% at T=0.10), because a softened planner no longer decisively avoids a genuinely mispredicted agent.
 
 **Generalization to real data (nuPlan open-loop, real map + real agents)**
 
@@ -107,8 +118,8 @@ cost-map is the most safety-critical interface.*
 |-------|--------------------------|
 | Rasterization attenuates (object→cost gain ≪ 1) | **Yes** — robust, all scenario categories |
 | Cost-map is the most safety-critical interface | **Yes** — robust, all categories |
-| Planner amplifies (cost→plan > 1) | Partial — clear in car-following, weak in dense intersections |
-| Planner-switch is a "universal gateway" | **No** — argmin-flip collapses 0.89 (sparse) → 0.02–0.23 (dense real) |
+| Planner amplifies (cost→plan > 1) | Partial — car-following 2.80, but intersection 0.83 and lane-change 0.11 (**attenuates**) |
+| Planner-switch is a "universal gateway" | **No** — argmin-flip collapses 0.89 (sparse) → 0.03–0.14 (dense real) |
 | Directed > random in raw strength | **No** — the robust distinction is *consistency*, not strength |
 
 > The **core characterization (rasterization = attenuator, cost-map = most-critical interface) generalizes

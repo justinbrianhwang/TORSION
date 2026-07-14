@@ -365,7 +365,8 @@ def _linearity_row(
         and row["interface"] == interface
     ]
     if not matches:
-        return {"gain_cv": None, "norm_slope": None, "verdict": "nonlinear"}
+        # No measurement for this interface -- not evidence of nonlinearity.
+        return {"gain_cv": None, "norm_slope": None, "verdict": "undetermined"}
     return matches[0]
 
 
