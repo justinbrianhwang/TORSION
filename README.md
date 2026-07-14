@@ -169,6 +169,23 @@ is 5.5× larger. Across scenarios, flip rate tracks **margin** (ρ = −0.77), n
 > it. We withdraw the density explanation. M2 (margin governs switching) is untouched — and now holds
 > across six scenarios.
 
+**…and the margin mechanism is then confirmed on real data.** We instrumented the nuPlan runner to log the
+same margin:
+
+- **Margin predicts switching on real logs** — Spearman ρ = 0.293 (p = 4e-104, n = 5,220). M2 replicates
+  outside the synthetic harness.
+- **The collapse tracks the margin** — real scenes carry a **2.0× larger** median margin (0.0091 vs 0.0046)
+  and flip **2.9× less** (0.089 vs 0.258). The gateway collapses *because the margin is larger*, not
+  because the scene is crowded.
+
+> **Actionable:** monitor the **planner's decision margin** — it predicts the failure mode, explains the
+> non-generalization, and the planner already computes it. The intuitive proxy (scene density) is
+> measurably *not* causal.
+>
+> *Limitation:* under our real cost map almost no candidate is collision-free (n_feasible = 1.04/17; **0 at
+> intersections**), so the planner is usually choosing the least-bad infeasible candidate. The margin stays
+> well-defined and predictive there, but it is not the same operating point as the synthetic harness.
+
 ---
 
 ## Repository layout
