@@ -137,15 +137,30 @@ dominate (short time-to-conflict makes misprediction the hazard).
 
 | Claim | Reproduces on real data? |
 |-------|--------------------------|
-| Rasterization attenuates (object→cost gain ≪ 1) | **Yes** — robust, all scenario categories |
-| Cost-map is the most safety-critical interface (by collision rate) | **Yes** — robust, all categories |
-| Planner amplifies (cost→plan > 1) | Partial — car-following 2.80, but intersection 0.83 and lane-change 0.11 (**attenuates**) |
-| Planner-switch is a "universal gateway" | **No** — argmin-flip collapses 0.89 (sparse) → 0.03–0.14 (dense real) |
+| Rasterization attenuates (object→cost gain ≪ 1) | **Yes** — 0.032–0.069, all categories |
+| Cost-map is the most safety-critical interface (by collision rate) | **Yes** — all categories |
+| Planner amplifies (cost→plan > 1) | **Yes** — 3.09 following, **3.74 intersection**, 2.60 lane-change (*strongest where densest*) |
+| Switching pathway transfers | **Yes** — argmin-flip **0.237** (real) vs **0.258** (synthetic) |
+| Margin governs switching (M2) | **Yes** — ρ = 0.219, p = 6e-58 |
 | Directed > random in raw strength | **No** — the robust distinction is *consistency*, not strength |
+| Switching is exclusive to argmin planners | **No** — potential-field gateway (0.30) *exceeds* sampling (0.23) |
 
-> The **core characterization (rasterization = attenuator, cost-map = most-critical interface) generalizes
-> to real data.** The planner-switch "gateway" is a mechanism observed in **sparse / argmin-planner** settings,
-> not a universal law. These bounds are stated explicitly rather than overclaimed.
+### 🐛 A negative result that turned out to be a bug
+
+We previously reported that the switching pathway **fails to generalize** (argmin-flip collapsing to
+0.03–0.14, cost→plan *attenuating* at intersections). **It was wrong.**
+
+Our real cost map built the drivable surface from nuPlan's `lanes_polygons` layer alone — but nuPlan stores
+the area a vehicle traverses **through an intersection** in a separate lane-connector layer. Inside an
+intersection the ego lies outside every lane polygon, so the whole grid scored as hard off-road and
+**every planner candidate "collided"** (`n_feasible` = 0 at intersections, 1.04/17 overall; planner stuck
+in fallback 92% of the time). Composing both layers restores a sane operating point (`n_feasible` = 10.7/17,
+fallback 92% → 16%) — and both negative findings reverse.
+
+> **We keep this in the paper rather than quietly fixing it.** A harness that silently makes every action
+> infeasible doesn't announce itself — it produces a plausible, publishable *"does not generalize"* result,
+> and the more you expect simulation to be fragile, the more readily you believe it. Reporting
+> `n_feasible` alongside any planner-based robustness metric is cheap insurance.
 
 **A hypothesis we tested and rejected.** The obvious reason the gateway collapses on real data is *scene
 density*: dense scenes make most planner candidates infeasible → the surviving minimum is well separated →
@@ -169,22 +184,14 @@ is 5.5× larger. Across scenarios, flip rate tracks **margin** (ρ = −0.77), n
 > it. We withdraw the density explanation. M2 (margin governs switching) is untouched — and now holds
 > across six scenarios.
 
-**…and the margin mechanism is then confirmed on real data.** We instrumented the nuPlan runner to log the
-same margin:
+**…and the margin mechanism is confirmed on real data.** We instrumented the nuPlan runner to log the same
+margin: inverse margin predicts argmin switching on real logs at **Spearman ρ = 0.219** (p = 6e-58,
+n = 5,220), just as in simulation (ρ = 0.42). **M2 replicates outside the synthetic harness.**
 
-- **Margin predicts switching on real logs** — Spearman ρ = 0.293 (p = 4e-104, n = 5,220). M2 replicates
-  outside the synthetic harness.
-- **The collapse tracks the margin** — real scenes carry a **2.0× larger** median margin (0.0091 vs 0.0046)
-  and flip **2.9× less** (0.089 vs 0.258). The gateway collapses *because the margin is larger*, not
-  because the scene is crowded.
-
-> **Actionable:** monitor the **planner's decision margin** — it predicts the failure mode, explains the
-> non-generalization, and the planner already computes it. The intuitive proxy (scene density) is
-> measurably *not* causal.
->
-> *Limitation:* under our real cost map almost no candidate is collision-free (n_feasible = 1.04/17; **0 at
-> intersections**), so the planner is usually choosing the least-bad infeasible candidate. The margin stays
-> well-defined and predictive there, but it is not the same operating point as the synthetic harness.
+> **Actionable:** monitor the **planner's decision margin** — it predicts the failure mode and the planner
+> already computes it, so exposing it is free. The intuitive proxy (scene density) is measurably *not*
+> causal: the controlled experiment shows density doesn't suppress switching, and on real data the densest
+> scenes (intersections) are where amplification is **strongest**.
 
 ---
 

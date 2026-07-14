@@ -47,12 +47,24 @@ LOCATION_TO_EPSG: dict[str, str] = {
 
 DEFAULT_LAYERS: tuple[str, ...] = (
     "lanes_polygons",
+    "gen_lane_connectors_scaled_width_polygons",
     "boundaries",
     "crosswalks",
     "walkways",
     "generic_drivable_areas",
 )
-LANE_LAYER = "lanes_polygons"
+
+# The drivable surface is NOT `lanes_polygons` alone. nuPlan stores the area a
+# vehicle traverses *through an intersection* in a separate lane-connector layer;
+# inside an intersection the ego is outside every `lanes_polygons` polygon. Taking
+# lanes only therefore marks the entire intersection as hard off-road, which makes
+# every planner candidate collide and leaves the planner permanently in its
+# fallback pool. Both layers together are the drivable surface.
+LANE_LAYERS: tuple[str, ...] = (
+    "lanes_polygons",
+    "gen_lane_connectors_scaled_width_polygons",
+)
+LANE_LAYER = "lanes_polygons"  # retained for backwards compatibility
 BOUNDARY_LAYER = "boundaries"
 SOURCE_CRS = "EPSG:4326"
 DRIVABLE_BASE_COST = 0.03
@@ -143,8 +155,9 @@ def load_map(
     if not path.is_file():
         raise FileNotFoundError(f"nuPlan map not found: {path}")
     layer_tuple = tuple(dict.fromkeys(str(layer) for layer in layers))
-    if LANE_LAYER not in layer_tuple:
-        layer_tuple = (LANE_LAYER, *layer_tuple)
+    missing = tuple(layer for layer in LANE_LAYERS if layer not in layer_tuple)
+    if missing:
+        layer_tuple = (*missing, *layer_tuple)
     return _load_map_cached(str(path.resolve()), _normalize_epsg(epsg), layer_tuple)
 
 
@@ -233,9 +246,16 @@ def _load_map_cached(path_str: str, epsg: str, layers: tuple[str, ...]) -> NuPla
     finally:
         connection.close()
 
-    lane_geometries = layers_by_name.get(LANE_LAYER, ())
+    # Drivable surface = lane polygons + intersection lane-connector polygons.
+    lane_geometries = tuple(
+        geometry
+        for layer in LANE_LAYERS
+        for geometry in layers_by_name.get(layer, ())
+    )
     if not lane_geometries:
-        raise ValueError(f"map layer {LANE_LAYER!r} is missing or empty in {path}")
+        raise ValueError(
+            f"none of the drivable layers {LANE_LAYERS!r} are present in {path}"
+        )
     boundary_geometries = layers_by_name.get(BOUNDARY_LAYER, ())
     return NuPlanMap(
         gpkg_path=path,
